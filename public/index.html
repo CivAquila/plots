@@ -47,40 +47,50 @@
     firebase.initializeApp(config);
 
     var email = "log@me.in";
-    firebase.auth().signInWithEmailAndPassword(email, prompt("Enter password"))
+    firebase.auth().signInWithEmailAndPassword(email, ''+prompt("Enter password"))
+    .catch(error => {
+      console.log('Error while authenticating:', error);
+    })
     .then(() => {
-      console.log('logged in');
-      return firebase.database().ref("plots").once('value');
+      console.log('logged in, getting owners');
+      return firebase.database().ref("owners").once('value');
     })
     .catch(error => {
       // Handle Errors here.
-      var errorCode = error.code;
-      var errorMessage = error.message;
-      console.log('Error while authenticating:', errorCode, errorMessage);
-      document.getElementById('app').innerHTML = 'Error while authenticating: '
-        + errorMessage + ' (' + errorCode + ')';
+      console.log('error getting owners:', error);
+      document.getElementById('app').innerHTML = 'Error while authenticating: ' + JSON.stringify(error);
+      return {val: function(){return{}}}; // no known owners
     })
-    .then(plots => {
-      plots = plots.val();
-      console.log('got plots:', plots);
-      CivMap.start({
-        attribution: '<a href="https://github.com/dev3map/dev3map.github.io">dev3map.github.io</a> | <a href="https://www.reddit.com/r/devotedmap/">reddit.com/r/devotedmap</a>',
-        tilesUrl: 'https://raw.githubusercontent.com/dev3map/tiles/master/',
-        claimsUrl: 'https://civaquila.firebaseio.com/plots.json',
-        basemaps: [
-          'terrain',
-          'night',
-          'simple',
-          'light',
-        ],
-        options: {
-          basemap: 'terrain',
-          claimOpacity: .5,
-          claims: plots,
-        },
+    .then(owners => {
+      owners = owners.val();
+      console.log('got owners:', owners);
+      return firebase.database().ref("plots").once('value')
+      .then(plots => {
+        plots = plots.val().map(plot => {
+          plot.owner = owners[parseInt(plot.number)];
+          return plot;
+        })
+        console.log('got transformed plots:', plots);
+        CivMap.start({
+          attribution: '<a href="https://github.com/dev3map/dev3map.github.io">dev3map.github.io</a> | <a href="https://www.reddit.com/r/devotedmap/">reddit.com/r/devotedmap</a>',
+          tilesUrl: 'https://raw.githubusercontent.com/dev3map/tiles/master/',
+          claimsUrl: 'https://civaquila.firebaseio.com/nonexistant-node.json',
+          basemaps: [
+            'terrain',
+            'night',
+            'simple',
+            'light',
+          ],
+          options: {
+            basemap: 'terrain',
+            claimOpacity: .5,
+            claims: plots,
+          },
+        });
       });
     })
     .catch(error => {
+      console.log('runtime error in app', error);
     });
   </script>
 </body>
